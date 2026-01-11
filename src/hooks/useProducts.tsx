@@ -14,6 +14,9 @@ export interface Product {
   original_price: number | null;
   is_promotion: boolean;
   image_url: string | null;
+  location_city: string | null;
+  location_url: string | null;
+  show_location: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -28,6 +31,9 @@ export interface ProductFormData {
   category_id?: string;
   subcategory_id?: string;
   image_url?: string;
+  location_city?: string;
+  location_url?: string;
+  show_location?: boolean;
   is_active?: boolean;
 }
 

@@ -98,7 +98,12 @@ export default function Shops() {
             {filteredShops.map((shop) => (
               <Link key={shop.id} to={`/c/${shop.slug}`} className="group">
                 <Card className="h-full border-none bg-white hover:shadow-2xl transition-all duration-500 rounded-[2.5rem] overflow-hidden shadow-sm">
-                  <div className="h-32 bg-gradient-to-r from-primary/10 to-orange-500/10 relative">
+                  <div className="h-32 relative overflow-hidden">
+                    {shop.cover_url ? (
+                      <img src={shop.cover_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-r from-primary/10 to-orange-500/10" />
+                    )}
                     <div className="absolute -bottom-10 left-8">
                       <div className="h-20 w-20 rounded-3xl bg-white p-1 shadow-xl border-4 border-white overflow-hidden">
                         {shop.logo_url ? (

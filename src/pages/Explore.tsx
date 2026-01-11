@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Dialog,
   DialogContent,
@@ -34,9 +35,11 @@ import {
   Sparkles,
   Eye,
   X,
-  ShoppingCart
+  ShoppingCart,
+  MapPin
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/hooks/useCart';
 import { CartSheet } from '@/components/CartSheet';
 import Logo from '@/components/Logo';
@@ -44,10 +47,14 @@ import Logo from '@/components/Logo';
 interface ProductWithShop {
   id: string;
   name: string;
+  description: string | null;
   price: number;
   image_url: string | null;
   is_promotion: boolean;
   original_price: number | null;
+  location_city: string | null;
+  location_url: string | null;
+  show_location: boolean;
   shop_id: string;
   created_at: string;
   shops: {
@@ -55,6 +62,10 @@ interface ProductWithShop {
     slug: string;
     whatsapp_number: string;
     logo_url: string | null;
+    user_id: string;
+    location_city: string | null;
+    location_url: string | null;
+    show_location: boolean;
   };
   categories: {
     name: string;
@@ -69,6 +80,7 @@ interface Shop {
 }
 
 export default function Explore() {
+  const { user } = useAuth();
   const [products, setProducts] = useState<ProductWithShop[]>([]);
   const [shops, setShops] = useState<Shop[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,7 +109,10 @@ export default function Explore() {
               slug,
               whatsapp_number,
               logo_url,
-              user_id
+              user_id,
+              location_city,
+              location_url,
+              show_location
             ),
             categories (
               name
@@ -215,10 +230,10 @@ export default function Explore() {
 
           <div className="flex items-center gap-2 shrink-0">
             <Button asChild variant="ghost" className="hidden sm:flex rounded-full">
-              <Link to="/auth">Vendre</Link>
+              <Link to={user ? "/products/new" : "/auth"}>Vendre</Link>
             </Button>
             <Button asChild className="gradient-primary text-white rounded-full px-6 shadow-md hover:shadow-lg transition-all">
-              <Link to="/auth">Commencer</Link>
+              <Link to={user ? "/dashboard" : "/auth"}>{user ? "Mon compte" : "Commencer"}</Link>
             </Button>
           </div>
         </div>
@@ -432,7 +447,7 @@ export default function Explore() {
                       </h3>
                     </div>
                     
-                    <div className="flex items-baseline gap-2 mb-4">
+                    <div className="flex items-baseline gap-2 mb-1">
                       <span className="font-black text-lg text-slate-900">{product.price} DH</span>
                       {product.is_promotion && product.original_price && (
                         <span className="text-xs text-slate-400 line-through">
@@ -440,6 +455,22 @@ export default function Explore() {
                         </span>
                       )}
                     </div>
+
+                    {(product.show_location || product.shops?.show_location) && (product.location_city || product.shops?.location_city) && (
+                      <a 
+                        href={product.location_url || product.shops?.location_url || '#'} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className={`flex items-center gap-1 text-[10px] text-slate-500 font-medium mb-3 hover:text-orange-600 transition-colors ${!(product.location_url || product.shops?.location_url) && 'pointer-events-none'}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!(product.location_url || product.shops?.location_url)) e.preventDefault();
+                        }}
+                      >
+                        <MapPin className="h-3 w-3 text-orange-500" />
+                        {product.location_city || product.shops?.location_city}
+                      </a>
+                    )}
 
                     <div className="grid grid-cols-2 gap-2">
                       <Button 
@@ -494,48 +525,101 @@ export default function Explore() {
         <DialogContent className="max-w-3xl p-0 overflow-hidden rounded-3xl border-none shadow-2xl">
           {selectedProduct && (
             <div className="grid md:grid-cols-2">
-              <div className="aspect-square bg-slate-100 relative">
-                <QuickViewGallery 
-                  product={selectedProduct} 
-                  currentIndex={quickViewImageIndex} 
-                  setIndex={setQuickViewImageIndex} 
-                />
-                {selectedProduct.is_promotion && (
-                  <Badge className="absolute top-6 left-6 bg-red-500 text-white px-4 py-1.5 text-sm font-black shadow-lg">
-                    PROMO
-                  </Badge>
-                )}
-              </div>
-              <div className="p-8 flex flex-col">
-                <div className="flex-1">
-                  <Link 
-                    to={`/c/${selectedProduct.shops.slug}`}
-                    className="text-xs font-black text-primary uppercase tracking-[0.2em] mb-4 block hover:underline"
-                  >
-                    {selectedProduct.shops.name}
-                  </Link>
-                  <DialogTitle className="text-3xl font-display font-black text-slate-900 mb-4">
-                    {selectedProduct.name}
-                  </DialogTitle>
-                  <div className="flex items-baseline gap-3 mb-6">
-                    <span className="text-4xl font-black text-primary">{selectedProduct.price} DH</span>
-                    {selectedProduct.is_promotion && selectedProduct.original_price && (
-                      <span className="text-xl text-slate-400 line-through font-medium">
-                        {selectedProduct.original_price} DH
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-slate-600 leading-relaxed mb-8">
-                    {selectedProduct.categories?.name && (
-                      <Badge variant="outline" className="mb-4 block w-fit">
-                        Catégorie: {selectedProduct.categories.name}
-                      </Badge>
-                    )}
-                    Découvrez ce produit exceptionnel chez {selectedProduct.shops.name}. Qualité garantie et service rapide via WhatsApp.
-                  </p>
+              <div className="flex flex-col bg-slate-100">
+                <div className="aspect-square relative">
+                  <QuickViewGallery 
+                    product={selectedProduct} 
+                    currentIndex={quickViewImageIndex} 
+                    setIndex={setQuickViewImageIndex} 
+                  />
+                  {selectedProduct.is_promotion && (
+                    <Badge className="absolute top-6 left-6 bg-red-500 text-white px-4 py-1.5 text-sm font-black shadow-lg">
+                      PROMO
+                    </Badge>
+                  )}
                 </div>
                 
-                <div className="space-y-3">
+                {/* Map Integration */}
+                {(selectedProduct.location_url || selectedProduct.shops?.location_url) && (
+                  <div className="h-48 w-full border-t border-slate-200 overflow-hidden relative group/map">
+                    <iframe
+                      width="100%"
+                      height="100%"
+                      frameBorder="0"
+                      style={{ border: 0 }}
+                      src={`https://maps.google.com/maps?q=${
+                        (selectedProduct.location_url || selectedProduct.shops?.location_url)?.match(/(-?\d+\.\d+),(-?\d+\.\d+)/)?.[0] || 
+                        selectedProduct.location_city || 
+                        selectedProduct.shops?.location_city
+                      }&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+                      allowFullScreen
+                    ></iframe>
+                    <a 
+                      href={selectedProduct.location_url || selectedProduct.shops?.location_url || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="absolute inset-0 bg-black/0 group-hover/map:bg-black/10 transition-colors flex items-center justify-center"
+                    >
+                      <Button variant="secondary" size="sm" className="opacity-0 group-hover/map:opacity-100 shadow-lg scale-90 group-hover/map:scale-100 transition-all font-bold">
+                        <MapPin className="h-4 w-4 mr-2 text-primary" />
+                        Ouvrir Google Maps
+                      </Button>
+                    </a>
+                  </div>
+                )}
+              </div>
+              <div className="p-8 flex flex-col h-full max-h-[95vh]">
+                <ScrollArea className="flex-1 pr-4 mb-6">
+                  <div className="space-y-6">
+                    <div>
+                      <Link 
+                        to={`/c/${selectedProduct.shops.slug}`}
+                        className="text-xs font-black text-primary uppercase tracking-[0.2em] block hover:underline mb-2"
+                      >
+                        {selectedProduct.shops.name}
+                      </Link>
+                      <DialogTitle className="text-3xl font-display font-black text-slate-900 leading-tight">
+                        {selectedProduct.name}
+                      </DialogTitle>
+                      {(selectedProduct.show_location || selectedProduct.shops?.show_location) && (selectedProduct.location_city || selectedProduct.shops?.location_city) && (
+                        <a 
+                          href={selectedProduct.location_url || selectedProduct.shops?.location_url || '#'} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className={`flex items-center gap-1.5 text-slate-500 text-sm font-medium mt-2 hover:text-orange-600 transition-colors ${!(selectedProduct.location_url || selectedProduct.shops?.location_url) && 'pointer-events-none'}`}
+                          onClick={(e) => !(selectedProduct.location_url || selectedProduct.shops?.location_url) && e.preventDefault()}
+                        >
+                          <MapPin className="h-4 w-4 text-orange-500" />
+                          {selectedProduct.location_city || selectedProduct.shops?.location_city}
+                          {(selectedProduct.location_url || selectedProduct.shops?.location_url) && <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full ml-1">Itinéraire</span>}
+                        </a>
+                      )}
+                    </div>
+
+                    <div className="flex items-baseline gap-3">
+                      <span className="text-4xl font-black text-primary">{selectedProduct.price} DH</span>
+                      {selectedProduct.is_promotion && selectedProduct.original_price && (
+                        <span className="text-xl text-slate-400 line-through font-medium">
+                          {selectedProduct.original_price} DH
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="pt-6 border-t">
+                      {selectedProduct.categories?.name && (
+                        <Badge variant="outline" className="mb-4 block w-fit">
+                          Catégorie: {selectedProduct.categories.name}
+                        </Badge>
+                      )}
+                      <h4 className="font-bold text-slate-900 mb-4 uppercase text-xs tracking-widest">Description</h4>
+                      <div className="text-slate-600 leading-relaxed whitespace-pre-wrap break-words text-base">
+                        {selectedProduct.description || `Découvrez ce produit exceptionnel chez ${selectedProduct.shops.name}. Qualité garantie et service rapide via WhatsApp.`}
+                      </div>
+                    </div>
+                  </div>
+                </ScrollArea>
+                
+                <div className="space-y-3 pt-4 border-t bg-white">
                   <Button 
                     variant="outline"
                     className="w-full h-14 border-2 border-primary text-primary hover:bg-primary hover:text-white rounded-2xl text-lg font-black shadow-lg transition-all gap-3"

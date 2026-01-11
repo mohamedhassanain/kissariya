@@ -126,10 +126,13 @@ export type Database = {
           image_url: string | null
           is_active: boolean
           is_promotion: boolean
+          location_city: string | null
+          location_url: string | null
           name: string
           original_price: number | null
           price: number
           shop_id: string
+          show_location: boolean
           subcategory_id: string | null
           updated_at: string
         }
@@ -141,10 +144,13 @@ export type Database = {
           image_url?: string | null
           is_active?: boolean
           is_promotion?: boolean
+          location_city?: string | null
+          location_url?: string | null
           name: string
           original_price?: number | null
           price: number
           shop_id: string
+          show_location?: boolean
           subcategory_id?: string | null
           updated_at?: string
         }
@@ -156,10 +162,13 @@ export type Database = {
           image_url?: string | null
           is_active?: boolean
           is_promotion?: boolean
+          location_city?: string | null
+          location_url?: string | null
           name?: string
           original_price?: number | null
           price?: number
           shop_id?: string
+          show_location?: boolean
           subcategory_id?: string | null
           updated_at?: string
         }
@@ -213,8 +222,12 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          location_city: string | null
+          location_url: string | null
           logo_url: string | null
+          cover_url: string | null
           name: string
+          show_location: boolean
           slug: string
           updated_at: string
           user_id: string
@@ -224,8 +237,12 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          location_city?: string | null
+          location_url?: string | null
           logo_url?: string | null
+          cover_url?: string | null
           name: string
+          show_location?: boolean
           slug: string
           updated_at?: string
           user_id: string
@@ -235,8 +252,12 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          location_city?: string | null
+          location_url?: string | null
           logo_url?: string | null
+          cover_url?: string | null
           name?: string
+          show_location?: boolean
           slug?: string
           updated_at?: string
           user_id?: string

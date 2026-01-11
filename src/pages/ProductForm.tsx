@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, Upload, Loader2, Package, X } from 'lucide-react';
+import { ArrowLeft, Upload, Loader2, Package, X, MapPin, Navigation } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ProductForm() {
@@ -41,7 +41,38 @@ export default function ProductForm() {
   const [subcategoryId, setSubcategoryId] = useState<string>('');
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [locationCity, setLocationCity] = useState('');
+  const [locationUrl, setLocationUrl] = useState('');
+  const [showLocation, setShowLocation] = useState(false);
   const [isActive, setIsActive] = useState(true);
+  const [isLocating, setIsLocating] = useState(false);
+
+  const updateCityFromCoords = async (lat: number, lon: number) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
+      );
+      const data = await response.json();
+      if (data.address) {
+        const city = data.address.city || data.address.town || data.address.village || data.address.suburb || data.address.county || '';
+        if (city) setLocationCity(city);
+      }
+    } catch (error) {
+      console.error("Error fetching city:", error);
+    }
+  };
+
+  const handleUrlChange = (url: string) => {
+    setLocationUrl(url);
+    // Extract coordinates from Google Maps URL
+    const coordsMatch = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || url.match(/q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (coordsMatch) {
+      const lat = parseFloat(coordsMatch[1]);
+      const lon = parseFloat(coordsMatch[2]);
+      updateCityFromCoords(lat, lon);
+      toast.success("Coordonnées extraites du lien !");
+    }
+  };
 
   const { subcategories } = useSubcategories(categoryId || undefined);
 
@@ -85,6 +116,9 @@ export default function ProductForm() {
         
         setImageUrls(urls);
         setImagePreviews(urls);
+        setLocationCity(product.location_city || '');
+        setLocationUrl(product.location_url || '');
+        setShowLocation(product.show_location || false);
         setIsActive(product.is_active);
       }
     }
@@ -126,6 +160,59 @@ export default function ProductForm() {
     setImagePreviews(newPreviews);
   };
 
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error("La géolocalisation n'est pas supportée par votre navigateur");
+      return;
+    }
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        const url = `https://www.google.com/maps?q=${latitude},${longitude}`;
+        setLocationUrl(url);
+        
+        try {
+          // Reverse geocoding using OpenStreetMap Nominatim
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+          );
+          const data = await response.json();
+          
+          if (data.address) {
+            const city = data.address.city || 
+                         data.address.town || 
+                         data.address.village || 
+                         data.address.suburb || 
+                         data.address.county || 
+                         '';
+            if (city) {
+              setLocationCity(city);
+            }
+          }
+          toast.success("Position et ville récupérées !");
+        } catch (error) {
+          console.error("Error during reverse geocoding:", error);
+          toast.success("Position récupérée (ville non identifiée)");
+        } finally {
+          setIsLocating(false);
+        }
+      },
+      (error) => {
+        setIsLocating(false);
+        let message = "Impossible de récupérer votre position";
+        if (error.code === 1) message = "Permission de géolocalisation refusée";
+        else if (error.code === 2) message = "Position non disponible";
+        else if (error.code === 3) message = "Délai d'attente dépassé";
+        
+        toast.error(message);
+        console.error(error);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -153,6 +240,9 @@ export default function ProductForm() {
       category_id: categoryId || undefined,
       subcategory_id: subcategoryId || undefined,
       image_url: imageUrls.length > 0 ? JSON.stringify(imageUrls) : undefined,
+      location_city: locationCity.trim() || undefined,
+      location_url: locationUrl.trim() || undefined,
+      show_location: showLocation,
       is_active: isActive,
     };
 
@@ -356,6 +446,72 @@ export default function ProductForm() {
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* Location */}
+              <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Afficher la localisation</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Permettre aux acheteurs de voir la ville du vendeur
+                    </p>
+                  </div>
+                  <Switch
+                    checked={showLocation}
+                    onCheckedChange={setShowLocation}
+                  />
+                </div>
+
+                {showLocation && (
+                  <div className="space-y-4 pt-2 border-t">
+                    <div className="space-y-2">
+                      <Label htmlFor="locationCity">Ville</Label>
+                      <div className="relative">
+                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="locationCity"
+                          placeholder="Ex: Casablanca, Marrakech..."
+                          value={locationCity}
+                          onChange={(e) => setLocationCity(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="locationUrl">Lien Google Maps / Waze</Label>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <Navigation className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            id="locationUrl"
+                            placeholder="Lien de votre position..."
+                            value={locationUrl}
+                            onChange={(e) => handleUrlChange(e.target.value)}
+                            className="pl-10"
+                          />
+                        </div>
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="icon"
+                          onClick={getCurrentLocation}
+                          disabled={isLocating}
+                          title="Ma position actuelle"
+                        >
+                          {isLocating ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Navigation className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        Cliquez sur l'icône pour utiliser votre position actuelle ou collez un lien Google Maps.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Active Status */}

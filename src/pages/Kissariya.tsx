@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -7,15 +7,23 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { Store, MessageCircle, Search, Tag, Package, X, ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Store, MessageCircle, Search, Tag, Package, X, ChevronLeft, ChevronRight, ShoppingCart, Eye, Share2, MapPin } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { CartSheet } from '@/components/CartSheet';
+import { toast } from 'sonner';
 
 interface Shop {
   id: string;
@@ -23,8 +31,12 @@ interface Shop {
   name: string;
   description: string | null;
   logo_url: string | null;
+  cover_url: string | null;
   whatsapp_number: string;
   slug: string;
+  location_city: string | null;
+  location_url: string | null;
+  show_location: boolean;
 }
 
 interface Category {
@@ -50,11 +62,14 @@ interface Product {
   image_url: string | null;
   category_id: string | null;
   subcategory_id: string | null;
+  location_city: string | null;
+  location_url: string | null;
+  show_location: boolean;
 }
 
 export default function Catalog() {
   const { slug } = useParams<{ slug: string }>();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [shop, setShop] = useState<any | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
@@ -63,13 +78,14 @@ export default function Catalog() {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [quickViewImageIndex, setQuickViewImageIndex] = useState(0);
 
   useEffect(() => {
     const fetchData = async () => {
       if (!slug) return;
 
       try {
-        // Fetch shop
         const { data: shopData, error: shopError } = await supabase
           .from('shops')
           .select('*')
@@ -83,14 +99,13 @@ export default function Catalog() {
 
         setShop(shopData);
 
-        // Track view only if visitor is not the owner
-        if (!user || user.id !== shopData.user_id) {
+        // Track shop view if not owner and auth is determined
+        if (!authLoading && (!user || user.id !== shopData.user_id)) {
           await supabase.from('kissariya_views').insert({
             shop_id: shopData.id,
           });
         }
 
-        // Fetch categories
         const { data: categoriesData } = await supabase
           .from('categories')
           .select('*')
@@ -99,7 +114,6 @@ export default function Catalog() {
 
         if (categoriesData) setCategories(categoriesData);
 
-        // Fetch subcategories
         const { data: subcategoriesData } = await supabase
           .from('subcategories')
           .select('*')
@@ -107,7 +121,6 @@ export default function Catalog() {
 
         if (subcategoriesData) setSubcategories(subcategoriesData);
 
-        // Fetch products
         const { data: productsData } = await supabase
           .from('products')
           .select('*')
@@ -115,7 +128,7 @@ export default function Catalog() {
           .eq('is_active', true)
           .order('created_at', { ascending: false });
 
-        if (productsData) setProducts(productsData);
+        if (productsData) setProducts(productsData as any);
       } catch (error) {
         console.error('Error fetching kissariya:', error);
       } finally {
@@ -124,7 +137,7 @@ export default function Catalog() {
     };
 
     fetchData();
-  }, [slug]);
+  }, [slug, user]);
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
@@ -139,6 +152,14 @@ export default function Catalog() {
     return products.filter(p => p.is_promotion);
   }, [products]);
 
+  const displayProducts = useMemo(() => {
+    if (!selectedCategory && !search && promotionProducts.length > 0) {
+      const promoIds = promotionProducts.slice(0, 3).map(p => p.id);
+      return filteredProducts.filter(p => !promoIds.includes(p.id));
+    }
+    return filteredProducts;
+  }, [filteredProducts, promotionProducts, selectedCategory, search]);
+
   const getSubcategoriesForCategory = (categoryId: string) => {
     return subcategories.filter(s => s.category_id === categoryId);
   };
@@ -146,8 +167,8 @@ export default function Catalog() {
   const handleWhatsAppOrder = async (product: Product) => {
     if (!shop) return;
 
-    // Track product view if not owner
-    if (!user || user.id !== shop.user_id) {
+    // Track product view if not owner and auth is determined
+    if (!authLoading && (!user || user.id !== shop.user_id)) {
       await supabase.from('product_views').insert({
         product_id: product.id,
         shop_id: shop.id,
@@ -162,8 +183,15 @@ ${product.is_promotion && product.original_price ? `🏷️ (Au lieu de ${produc
 
 Pouvez-vous me donner plus d'informations?`;
 
-    const whatsappUrl = `https://wa.me/${shop.whatsapp_number.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`;
+    const whatsappUrl = `https://wa.me/${shop.whatsapp_number.replace(/[^0-9]/g, '') || ''}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
+  };
+
+  const handleShare = (product: Product | null) => {
+    if (!product) return;
+    const url = window.location.href;
+    navigator.clipboard.writeText(url);
+    toast.success('Lien du produit copié !');
   };
 
   const clearFilters = () => {
@@ -203,29 +231,42 @@ Pouvez-vous me donner plus d'informations?`;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-background">
-      {/* Header */}
-      <header className="gradient-primary text-primary-foreground py-8 px-4">
-        <div className="max-w-4xl mx-auto text-center">
+      <header className="relative text-primary-foreground overflow-hidden">
+        {shop.cover_url ? (
+          <div className="absolute inset-0 z-0">
+            <img 
+              src={shop.cover_url} 
+              alt="" 
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
+          </div>
+        ) : (
+          <div className="absolute inset-0 gradient-primary z-0" />
+        )}
+        
+        <div className="relative z-10 max-w-4xl mx-auto px-4 py-12 text-center">
           {shop.logo_url ? (
             <img 
               src={shop.logo_url} 
               alt={shop.name}
-              className="h-20 w-20 mx-auto rounded-2xl object-cover mb-4 shadow-lg border-4 border-primary-foreground/20"
+              className="h-24 w-24 mx-auto rounded-3xl object-cover mb-4 shadow-2xl border-4 border-white/20"
             />
           ) : (
-            <div className="h-20 w-20 mx-auto rounded-2xl bg-primary-foreground/20 flex items-center justify-center mb-4">
-              <Store className="h-10 w-10" />
+            <div className="h-24 w-24 mx-auto rounded-3xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-4 border-4 border-white/10">
+              <Store className="h-12 w-12" />
             </div>
           )}
-          <h1 className="text-3xl font-display font-bold">{shop.name}</h1>
+          <h1 className="text-4xl font-display font-bold drop-shadow-lg">{shop.name}</h1>
           {shop.description && (
-            <p className="mt-2 opacity-90">{shop.description}</p>
+            <p className="mt-3 opacity-90 max-w-2xl mx-auto text-lg font-medium drop-shadow-md line-clamp-2">
+              {shop.description}
+            </p>
           )}
         </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6">
-        {/* Search */}
         <div className="relative mb-6">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -236,7 +277,6 @@ Pouvez-vous me donner plus d'informations?`;
           />
         </div>
 
-        {/* Active Filters */}
         {(selectedCategory || selectedSubcategory || search) && (
           <div className="flex flex-wrap gap-2 mb-4">
             {selectedCategory && (
@@ -266,7 +306,6 @@ Pouvez-vous me donner plus d'informations?`;
           </div>
         )}
 
-        {/* Promotions Section */}
         {promotionProducts.length > 0 && !selectedCategory && !search && (
           <section className="mb-8">
             <h2 className="text-xl font-display font-bold mb-4 flex items-center gap-2">
@@ -281,13 +320,14 @@ Pouvez-vous me donner plus d'informations?`;
                   onOrder={() => handleWhatsAppOrder(product)}
                   addToCart={addToCart}
                   shop={shop}
+                  onQuickView={() => setSelectedProduct(product)}
+                  onShare={() => handleShare(product)}
                 />
               ))}
             </div>
           </section>
         )}
 
-        {/* Categories Navigation */}
         {categories.length > 0 && (
           <Accordion type="single" collapsible className="mb-6">
             <AccordionItem value="categories" className="border rounded-lg px-4">
@@ -345,8 +385,7 @@ Pouvez-vous me donner plus d'informations?`;
           </Accordion>
         )}
 
-        {/* Products Grid */}
-        {filteredProducts.length === 0 ? (
+        {displayProducts.length === 0 ? (
           <div className="text-center py-12">
             <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="font-semibold mb-2">Aucun produit trouvé</h3>
@@ -358,25 +397,164 @@ Pouvez-vous me donner plus d'informations?`;
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            {filteredProducts.map((product) => (
+            {displayProducts.map((product) => (
               <ProductCard 
                 key={product.id} 
                 product={product} 
                 onOrder={() => handleWhatsAppOrder(product)}
                 addToCart={addToCart}
                 shop={shop}
+                onQuickView={() => setSelectedProduct(product)}
+                onShare={() => handleShare(product)}
               />
             ))}
           </div>
         )}
       </main>
 
-      {/* Floating Cart Button */}
+      <Dialog open={!!selectedProduct} onOpenChange={(open) => {
+        if (!open) {
+          setSelectedProduct(null);
+          setQuickViewImageIndex(0);
+        }
+      }}>
+        <DialogContent className="max-w-3xl p-0 overflow-hidden rounded-3xl border-none shadow-2xl">
+          {selectedProduct && (
+            <div className="grid md:grid-cols-2">
+              <div className="flex flex-col bg-slate-100">
+                <div className="aspect-square relative">
+                  <QuickViewGallery 
+                    product={selectedProduct} 
+                    currentIndex={quickViewImageIndex} 
+                    setIndex={setQuickViewImageIndex} 
+                  />
+                  {selectedProduct.is_promotion && (
+                    <Badge className="absolute top-6 left-6 bg-red-500 text-white px-4 py-1.5 text-sm font-black shadow-lg">
+                      PROMO
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Map Integration */}
+                {(selectedProduct.location_url || shop.location_url) && (
+                  <div className="h-48 w-full border-t border-slate-200 overflow-hidden relative group/map">
+                    <iframe
+                      width="100%"
+                      height="100%"
+                      frameBorder="0"
+                      style={{ border: 0 }}
+                      src={`https://maps.google.com/maps?q=${
+                        (selectedProduct.location_url || shop.location_url)?.match(/(-?\d+\.\d+),(-?\d+\.\d+)/)?.[0] || 
+                        selectedProduct.location_city || 
+                        shop.location_city
+                      }&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+                      allowFullScreen
+                    ></iframe>
+                    <a 
+                      href={selectedProduct.location_url || shop.location_url || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="absolute inset-0 bg-black/0 group-hover/map:bg-black/10 transition-colors flex items-center justify-center"
+                    >
+                      <Button variant="secondary" size="sm" className="opacity-0 group-hover/map:opacity-100 shadow-lg scale-90 group-hover/map:scale-100 transition-all font-bold">
+                        <MapPin className="h-4 w-4 mr-2 text-primary" />
+                        Ouvrir Google Maps
+                      </Button>
+                    </a>
+                  </div>
+                )}
+              </div>
+              <div className="p-8 flex flex-col h-[500px] md:h-[600px]">
+                <ScrollArea className="flex-1 pr-4 mb-6">
+                  <div className="space-y-4">
+                    <DialogTitle className="text-3xl font-display font-black text-slate-900">
+                      {selectedProduct.name}
+                    </DialogTitle>
+                    {(selectedProduct.show_location || shop.show_location) && (selectedProduct.location_city || shop.location_city) && (
+                      <a 
+                        href={selectedProduct.location_url || shop.location_url || '#'} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className={`flex items-center gap-1.5 text-slate-500 text-sm font-medium hover:text-orange-600 transition-colors ${!(selectedProduct.location_url || shop.location_url) && 'pointer-events-none'}`}
+                        onClick={(e) => !(selectedProduct.location_url || shop.location_url) && e.preventDefault()}
+                      >
+                        <MapPin className="h-4 w-4 text-orange-500" />
+                        {selectedProduct.location_city || shop.location_city}
+                        {(selectedProduct.location_url || shop.location_url) && <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full ml-1">Itinéraire</span>}
+                      </a>
+                    )}
+                    <div className="flex items-baseline gap-3">
+                      <span className="text-4xl font-black text-primary">{selectedProduct.price} DH</span>
+                      {selectedProduct.is_promotion && selectedProduct.original_price && (
+                        <span className="text-xl text-slate-400 line-through font-medium">
+                          {selectedProduct.original_price} DH
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-slate-600 leading-relaxed pt-4 border-t">
+                      {selectedProduct.description ? (
+                        <div className="whitespace-pre-wrap text-base">
+                          {selectedProduct.description}
+                        </div>
+                      ) : (
+                        <p className="italic text-slate-400 text-sm">
+                          Découvrez ce produit exceptionnel chez {shop.name}. Qualité garantie et service rapide via WhatsApp.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </ScrollArea>
+                
+                <div className="space-y-3">
+                  <Button 
+                    variant="outline"
+                    className="w-full h-12 border-2 border-slate-200 text-slate-600 hover:bg-slate-50 rounded-2xl text-base font-black shadow-sm transition-all gap-3"
+                    onClick={() => handleShare(selectedProduct)}
+                  >
+                    <Share2 className="h-5 w-5" />
+                    Partager le produit
+                  </Button>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button 
+                      variant="outline"
+                      className="h-14 border-2 border-orange-500 text-orange-600 hover:bg-orange-50 rounded-2xl text-lg font-black shadow-lg transition-all gap-3"
+                      onClick={() => {
+                        const images = selectedProduct.image_url?.startsWith('[') 
+                          ? JSON.parse(selectedProduct.image_url) 
+                          : [selectedProduct.image_url];
+                        addToCart({
+                          id: selectedProduct.id,
+                          name: selectedProduct.name,
+                          price: selectedProduct.price,
+                          image_url: images[0] || null,
+                          shop_id: shop.id,
+                          shop_name: shop.name,
+                          whatsapp_number: shop.whatsapp_number
+                        });
+                      }}
+                    >
+                      <ShoppingCart className="h-6 w-6" />
+                      Panier
+                    </Button>
+                    <Button 
+                      className="h-14 bg-[#25D366] hover:bg-[#20ba5a] text-white rounded-2xl text-lg font-black shadow-lg hover:shadow-xl transition-all gap-3"
+                      onClick={() => handleWhatsAppOrder(selectedProduct)}
+                    >
+                      <MessageCircle className="h-6 w-6" />
+                      Direct
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <div className="fixed bottom-6 right-6 z-50">
         <CartSheet />
       </div>
 
-      {/* Footer */}
       <footer className="mt-12 py-6 border-t bg-card">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <p className="text-sm text-muted-foreground">
@@ -392,15 +570,18 @@ function ProductCard({
   product, 
   onOrder,
   addToCart,
-  shop
+  shop,
+  onQuickView,
+  onShare
 }: { 
   product: Product;
   onOrder: () => void;
   addToCart: (item: any) => void;
-  shop: any;
+  shop: Shop;
+  onQuickView: () => void;
+  onShare: () => void;
 }) {
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  
+  const { user, loading: authLoading } = useAuth();
   const images = useMemo(() => {
     if (!product.image_url) return [];
     try {
@@ -413,115 +594,200 @@ function ProductCard({
     }
   }, [product.image_url]);
 
+  const displayImage = images[0];
+
+  // Priorité à la localisation du produit, sinon celle de la boutique
+  const showLoc = product.show_location || shop.show_location;
+  const locCity = product.location_city || shop.location_city;
+  const locUrl = product.location_url || shop.location_url;
+
   return (
-    <Card className="border-2 overflow-hidden hover:shadow-lg transition-all group">
-      {/* Product Image */}
-      <div className="aspect-square bg-muted overflow-hidden relative">
-        {images.length > 0 ? (
-          <>
-            <img 
-              src={images[currentImageIndex]} 
-              alt={product.name}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            />
-            {images.length > 1 && (
-              <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1 px-2">
-                {images.map((_, idx) => (
-                  <div 
-                    key={idx}
-                    className={`h-1 rounded-full transition-all ${idx === currentImageIndex ? 'w-4 bg-primary' : 'w-1 bg-white/50'}`}
-                  />
-                ))}
-              </div>
-            )}
-            {images.length > 1 && (
-              <div className="absolute inset-0 flex items-center justify-between px-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-6 w-6 rounded-full bg-black/20 hover:bg-black/40 text-white"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCurrentImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
-                  }}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-6 w-6 rounded-full bg-black/20 hover:bg-black/40 text-white"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCurrentImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
-                  }}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-          </>
+    <Card className="group border-none bg-white hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 overflow-hidden rounded-2xl shadow-sm cursor-pointer" onClick={onQuickView}>
+      <div className="aspect-square relative overflow-hidden">
+        {displayImage ? (
+          <img 
+            src={displayImage} 
+            alt={product.name} 
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+          />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Package className="h-12 w-12 text-muted-foreground" />
+          <div className="w-full h-full bg-slate-100 flex items-center justify-center">
+            <Package className="h-12 w-12 text-slate-300" />
           </div>
         )}
+        
+        {/* Overlay Actions */}
+        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+          <Button 
+            size="icon" 
+            variant="secondary" 
+            className="rounded-full h-12 w-12 shadow-xl hover:scale-110 transition-transform"
+            onClick={(e) => {
+              e.stopPropagation();
+              onQuickView();
+            }}
+          >
+            <Eye className="h-5 w-5" />
+          </Button>
+          <Button 
+            size="icon" 
+            variant="secondary" 
+            className="rounded-full h-12 w-12 shadow-xl hover:scale-110 transition-transform"
+            onClick={(e) => {
+              e.stopPropagation();
+              onShare();
+            }}
+          >
+            <Share2 className="h-5 w-5" />
+          </Button>
+        </div>
+
         {product.is_promotion && (
-          <Badge className="absolute top-2 right-2 bg-promotion text-promotion-foreground">
-            Promo
-          </Badge>
+          <div className="absolute top-3 left-3">
+            <Badge className="bg-red-500 hover:bg-red-600 border-none px-3 py-1 shadow-lg">
+              PROMO
+            </Badge>
+          </div>
         )}
       </div>
-
-      <CardContent className="p-3">
-        <h3 className="font-semibold text-sm truncate">{product.name}</h3>
+      
+      <CardContent className="p-4">
+        <div className="mb-3">
+          <h3 className="font-bold text-slate-800 text-sm line-clamp-2 h-10 group-hover:text-primary transition-colors">
+            {product.name}
+          </h3>
+        </div>
         
-        <div className="mt-1 mb-3">
-          {product.is_promotion && product.original_price ? (
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-promotion">{product.price} DH</span>
-              <span className="text-xs text-muted-foreground line-through">
-                {product.original_price} DH
-              </span>
-            </div>
-          ) : (
-            <span className="font-bold">{product.price} DH</span>
+        <div className="flex items-baseline gap-2 mb-1">
+          <span className="font-black text-lg text-slate-900">{product.price} DH</span>
+          {product.is_promotion && product.original_price && (
+            <span className="text-xs text-slate-400 line-through">
+              {product.original_price} DH
+            </span>
           )}
         </div>
 
+        {showLoc && locCity && (
+          <a 
+            href={locUrl || '#'} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className={`flex items-center gap-1 text-[10px] text-slate-500 font-medium mb-3 hover:text-orange-600 transition-colors ${!locUrl && 'pointer-events-none'}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!locUrl) e.preventDefault();
+            }}
+          >
+            <MapPin className="h-3 w-3 text-orange-500" />
+            {locCity}
+          </a>
+        )}
+
         <div className="grid grid-cols-2 gap-2">
           <Button 
-            onClick={() => {
-              const images = product.image_url?.startsWith('[') 
-                ? JSON.parse(product.image_url) 
-                : [product.image_url];
+            variant="outline"
+            className="w-full border-primary text-primary hover:bg-primary hover:text-white rounded-xl h-10 shadow-sm transition-all gap-2"
+            onClick={async (e) => {
+              e.stopPropagation();
+              // Track product view if not owner and auth is determined
+              if (!authLoading && (!user || user.id !== shop.user_id)) {
+                await supabase.from('product_views').insert({
+                  product_id: product.id,
+                  shop_id: shop.id,
+                });
+              }
+
               addToCart({
                 id: product.id,
                 name: product.name,
                 price: product.price,
-                image_url: images[0] || null,
+                image_url: displayImage,
                 shop_id: shop.id,
                 shop_name: shop.name,
                 whatsapp_number: shop.whatsapp_number
               });
             }}
-            size="sm"
-            variant="outline"
-            className="border-primary text-primary hover:bg-primary hover:text-white"
           >
-            <ShoppingCart className="h-4 w-4 mr-1" />
-            Panier
+            <ShoppingCart className="h-4 w-4" />
+            <span className="text-[10px] font-bold">Panier</span>
           </Button>
           <Button 
-            onClick={onOrder}
-            size="sm"
-            className="bg-whatsapp hover:bg-whatsapp/90 text-whatsapp-foreground"
+            className="w-full bg-[#25D366] hover:bg-[#20ba5a] text-white rounded-xl h-10 shadow-sm hover:shadow-md transition-all gap-2"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOrder();
+            }}
           >
-            <MessageCircle className="h-4 w-4 mr-1" />
-            Direct
+            <MessageCircle className="h-4 w-4" />
+            <span className="text-[10px] font-bold">Direct</span>
           </Button>
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function QuickViewGallery({ product, currentIndex, setIndex }: { product: any, currentIndex: number, setIndex: (i: number) => void }) {
+  const images = useMemo(() => {
+    if (!product.image_url) return [];
+    try {
+      if (product.image_url.startsWith('[')) return JSON.parse(product.image_url);
+      return [product.image_url];
+    } catch (e) {
+      return [product.image_url];
+    }
+  }, [product.image_url]);
+
+  if (images.length === 0) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <Package className="h-20 w-20 text-slate-300" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full h-full group">
+      <img 
+        src={images[currentIndex]} 
+        alt={product.name} 
+        className="w-full h-full object-cover"
+      />
+      {images.length > 1 && (
+        <>
+          <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 px-4 z-10">
+            {images.map((_, idx) => (
+              <button 
+                key={idx}
+                onClick={() => setIndex(idx)}
+                className={`h-2 rounded-full transition-all ${idx === currentIndex ? 'w-8 bg-primary' : 'w-2 bg-white/50 hover:bg-white/80'}`}
+              />
+            ))}
+          </div>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="absolute left-4 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-black/20 hover:bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIndex(currentIndex === 0 ? images.length - 1 : currentIndex - 1);
+            }}
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="absolute right-4 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-black/20 hover:bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIndex(currentIndex === images.length - 1 ? 0 : currentIndex + 1);
+            }}
+          >
+            <ChevronRight className="h-6 w-6" />
+          </Button>
+        </>
+      )}
+    </div>
   );
 }

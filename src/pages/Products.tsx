@@ -35,7 +35,8 @@ import {
   Package,
   Tag,
   Eye,
-  EyeOff
+  EyeOff,
+  MapPin
 } from 'lucide-react';
 
 export default function Products() {
@@ -261,6 +262,19 @@ function ProductCard({
                   <Tag className="h-3 w-3" />
                   {categoryName}
                 </p>
+                {product.show_location && product.location_city && (
+                  <a 
+                    href={product.location_url || '#'} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className={`text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5 hover:text-orange-600 transition-colors ${!product.location_url && 'pointer-events-none'}`}
+                    onClick={(e) => !product.location_url && e.preventDefault()}
+                  >
+                    <MapPin className="h-3 w-3 text-orange-500" />
+                    {product.location_city}
+                    {product.location_url && <span className="text-[8px] bg-orange-100 text-orange-600 px-1 rounded-full ml-1">Lien actif</span>}
+                  </a>
+                )}
               </div>
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Button variant="ghost" size="icon" onClick={onEdit}>

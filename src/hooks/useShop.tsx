@@ -9,8 +9,12 @@ export interface Shop {
   name: string;
   description: string | null;
   logo_url: string | null;
+  cover_url: string | null;
   whatsapp_number: string;
   slug: string;
+  location_city: string | null;
+  location_url: string | null;
+  show_location: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -19,8 +23,12 @@ export interface ShopFormData {
   name: string;
   description?: string;
   logo_url?: string;
+  cover_url?: string;
   whatsapp_number: string;
   slug: string;
+  location_city?: string;
+  location_url?: string;
+  show_location?: boolean;
 }
 
 export function useShop() {
