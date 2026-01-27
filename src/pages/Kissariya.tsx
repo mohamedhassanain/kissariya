@@ -99,9 +99,11 @@ export default function Catalog() {
           .order('created_at', { ascending: false });
 
         if (productsData) {
-          const allProducts = productsData.map(p => ({
+          const allProducts: Product[] = productsData.map(p => ({
             ...p,
-            shops: shopData
+            shops: shopData,
+            categories: null,
+            subcategories: null
           })) as unknown as Product[];
           setProducts(allProducts);
 
