@@ -168,6 +168,4 @@ INSERT INTO storage.buckets (id, name, public) VALUES ('shop-images', 'shop-imag
 
 -- Storage policies for shop images
 CREATE POLICY "Anyone can view shop images" ON storage.objects FOR SELECT USING (bucket_id = 'shop-images');
-CREATE POLICY "Authenticated users can upload shop images" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'shop-images' AND auth.role() = 'authenticated');
-CREATE POLICY "Users can update their own shop images" ON storage.objects FOR UPDATE USING (bucket_id = 'shop-images' AND auth.role() = 'authenticated');
-CREATE POLICY "Users can delete their own shop images" ON storage.objects FOR DELETE USING (bucket_id = 'shop-images' AND auth.role() = 'authenticated');
+CREATE POLICY "Authenticated users can manage shop images" ON storage.objects FOR ALL TO authenticated USING (bucket_id = 'shop-images') WITH CHECK (bucket_id = 'shop-images');

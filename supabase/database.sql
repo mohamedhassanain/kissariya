@@ -271,17 +271,11 @@ CREATE POLICY "shop_images_public_select"
 ON storage.objects FOR SELECT
 USING (bucket_id = 'shop-images');
 
-CREATE POLICY "shop_images_authenticated_insert"
-ON storage.objects FOR INSERT
-WITH CHECK (bucket_id = 'shop-images' AND auth.role() = 'authenticated');
-
-CREATE POLICY "shop_images_authenticated_update"
-ON storage.objects FOR UPDATE
-USING (bucket_id = 'shop-images' AND auth.role() = 'authenticated');
-
-CREATE POLICY "shop_images_authenticated_delete"
-ON storage.objects FOR DELETE
-USING (bucket_id = 'shop-images' AND auth.role() = 'authenticated');
+CREATE POLICY "shop_images_authenticated_manage"
+ON storage.objects FOR ALL
+TO authenticated
+USING (bucket_id = 'shop-images')
+WITH CHECK (bucket_id = 'shop-images');
 
 -- =====================================================
 -- REFRESH SUPABASE SCHEMA
