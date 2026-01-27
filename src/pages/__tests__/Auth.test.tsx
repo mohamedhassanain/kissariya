@@ -108,18 +108,18 @@ describe('Page Auth', () => {
     expect(mockSignIn).not.toHaveBeenCalled();
   });
 
-  it('affiche une erreur si Google Sign In échoue', async () => {
+  it('gère les erreurs de Google Sign In', async () => {
     const { user } = setupAuthTest();
-    mockSignInWithGoogle.mockResolvedValue({ error: { message: 'Google error' } });
+    
+    // Cas 1: Erreur retournée par l'API
+    mockSignInWithGoogle.mockResolvedValueOnce({ error: { message: 'Google error' } });
     await user.click(screen.getByText(/Continuer avec Google/i));
-    expect(mockSignInWithGoogle).toHaveBeenCalled();
-  });
+    expect(mockSignInWithGoogle).toHaveBeenCalledTimes(1);
 
-  it('gère les erreurs inattendues lors de Google Sign In', async () => {
-    const { user } = setupAuthTest();
-    mockSignInWithGoogle.mockImplementation(() => { throw new Error('Unexpected Google'); });
+    // Cas 2: Erreur inattendue (exception)
+    mockSignInWithGoogle.mockImplementationOnce(() => { throw new Error('Unexpected Google'); });
     await user.click(screen.getByText(/Continuer avec Google/i));
-    expect(mockSignInWithGoogle).toHaveBeenCalled();
+    expect(mockSignInWithGoogle).toHaveBeenCalledTimes(2);
   });
 
   it('gère les erreurs inattendues lors de la soumission', async () => {
