@@ -33,14 +33,22 @@ const renderWithProviders = (component: React.ReactNode) => {
   );
 };
 
+const setupAuthTest = () => {
+  const user = userEvent.setup();
+  renderWithProviders(<Auth />);
+  return { user };
+};
+
+const fillLoginForm = async (user: ReturnType<typeof userEvent.setup>, email: string, pass: string) => {
+  await user.type(screen.getByLabelText(/Email/i), email);
+  await user.type(screen.getByLabelText(/Mot de passe/i), pass);
+};
+
 const fillSignupForm = async (user: ReturnType<typeof userEvent.setup>, email: string, pass: string, confirm: string) => {
   await user.click(screen.getByRole('tab', { name: /Inscription/i }));
-  const emailInput = screen.getByLabelText(/Email/i, { selector: '#email-signup' });
-  const passwordInput = screen.getByLabelText(/Mot de passe/i, { selector: '#password-signup' });
-  const confirmInput = screen.getByLabelText(/Confirmer le mot de passe/i);
-  await user.type(emailInput, email);
-  await user.type(passwordInput, pass);
-  await user.type(confirmInput, confirm);
+  await user.type(screen.getByLabelText(/Email/i, { selector: '#email-signup' }), email);
+  await user.type(screen.getByLabelText(/Mot de passe/i, { selector: '#password-signup' }), pass);
+  await user.type(screen.getByLabelText(/Confirmer le mot de passe/i), confirm);
 };
 
 describe('Page Auth', () => {
@@ -49,145 +57,91 @@ describe('Page Auth', () => {
   });
 
   it('affiche le bouton Google', () => {
-    renderWithProviders(<Auth />);
+    setupAuthTest();
     expect(screen.getByText(/Continuer avec Google/i)).toBeInTheDocument();
   });
 
   it('affiche le champ de confirmation de mot de passe dans l\'onglet inscription', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<Auth />);
-    
-    const signupTab = screen.getByRole('tab', { name: /Inscription/i });
-    await user.click(signupTab);
-
+    const { user } = setupAuthTest();
+    await user.click(screen.getByRole('tab', { name: /Inscription/i }));
     await waitFor(() => {
       expect(screen.getByLabelText(/Confirmer le mot de passe/i)).toBeInTheDocument();
     });
   });
 
   it('gère la connexion avec succès', async () => {
-    const user = userEvent.setup();
+    const { user } = setupAuthTest();
     mockSignIn.mockResolvedValue({ data: {}, error: null });
-    renderWithProviders(<Auth />);
-
-    await user.type(screen.getByLabelText(/Email/i), 'test@example.com');
-    await user.type(screen.getByLabelText(/Mot de passe/i), 'password123');
+    await fillLoginForm(user, 'test@example.com', 'password123');
     await user.click(screen.getByRole('button', { name: /Se connecter/i }));
-
     expect(mockSignIn).toHaveBeenCalledWith('test@example.com', 'password123');
   });
 
   it('affiche une erreur si les identifiants sont incorrects', async () => {
-    const user = userEvent.setup();
+    const { user } = setupAuthTest();
     mockSignIn.mockResolvedValue({ data: null, error: { message: 'Invalid login credentials' } });
-    renderWithProviders(<Auth />);
-
-    await user.type(screen.getByLabelText(/Email/i), 'wrong@example.com');
-    await user.type(screen.getByLabelText(/Mot de passe/i), 'wrongpass');
+    await fillLoginForm(user, 'wrong@example.com', 'wrongpass');
     await user.click(screen.getByRole('button', { name: /Se connecter/i }));
-
-    await waitFor(() => {
-      expect(mockSignIn).toHaveBeenCalled();
-    });
+    await waitFor(() => expect(mockSignIn).toHaveBeenCalled());
   });
 
   it('gère l\'inscription avec succès', async () => {
-    const user = userEvent.setup();
+    const { user } = setupAuthTest();
     mockSignUp.mockResolvedValue({ data: {}, error: null });
-    renderWithProviders(<Auth />);
-
     await fillSignupForm(user, 'new@example.com', 'password123', 'password123');
     await user.click(screen.getByRole('button', { name: /Créer mon compte/i }));
-
     expect(mockSignUp).toHaveBeenCalledWith('new@example.com', 'password123');
   });
 
   it('affiche une erreur si l\'utilisateur existe déjà à l\'inscription', async () => {
-    const user = userEvent.setup();
+    const { user } = setupAuthTest();
     mockSignUp.mockResolvedValue({ data: null, error: { message: 'User already registered' } });
-    renderWithProviders(<Auth />);
-
     await fillSignupForm(user, 'existing@example.com', 'password123', 'password123');
     await user.click(screen.getByRole('button', { name: /Créer mon compte/i }));
-
-    await waitFor(() => {
-      expect(mockSignUp).toHaveBeenCalled();
-    });
+    await waitFor(() => expect(mockSignUp).toHaveBeenCalled());
   });
 
   it('affiche une erreur de validation si l\'email est invalide', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<Auth />);
-
-    await user.type(screen.getByLabelText(/Email/i), 'invalid-email');
-    await user.type(screen.getByLabelText(/Mot de passe/i), 'password123');
+    const { user } = setupAuthTest();
+    await fillLoginForm(user, 'invalid-email', 'password123');
     await user.click(screen.getByRole('button', { name: /Se connecter/i }));
-
     expect(mockSignIn).not.toHaveBeenCalled();
   });
 
   it('affiche une erreur si Google Sign In échoue', async () => {
-    const user = userEvent.setup();
+    const { user } = setupAuthTest();
     mockSignInWithGoogle.mockResolvedValue({ error: { message: 'Google error' } });
-    renderWithProviders(<Auth />);
-    
     await user.click(screen.getByText(/Continuer avec Google/i));
     expect(mockSignInWithGoogle).toHaveBeenCalled();
   });
 
   it('gère les erreurs inattendues lors de Google Sign In', async () => {
-    const user = userEvent.setup();
+    const { user } = setupAuthTest();
     mockSignInWithGoogle.mockImplementation(() => { throw new Error('Unexpected Google'); });
-    renderWithProviders(<Auth />);
-    
     await user.click(screen.getByText(/Continuer avec Google/i));
     expect(mockSignInWithGoogle).toHaveBeenCalled();
   });
 
   it('gère les erreurs inattendues lors de la soumission', async () => {
-    const user = userEvent.setup();
+    const { user } = setupAuthTest();
     mockSignIn.mockImplementation(() => { throw new Error('Unexpected'); });
-    renderWithProviders(<Auth />);
-
-    await user.type(screen.getByLabelText(/Email/i), 'test@example.com');
-    await user.type(screen.getByLabelText(/Mot de passe/i), 'password123');
+    await fillLoginForm(user, 'test@example.com', 'password123');
     await user.click(screen.getByRole('button', { name: /Se connecter/i }));
-
-    await waitFor(() => {
-      expect(mockSignIn).toHaveBeenCalled();
-    });
+    await waitFor(() => expect(mockSignIn).toHaveBeenCalled());
   });
 
   it('affiche un message d\'erreur générique si la connexion échoue sans message spécifique', async () => {
-    const user = userEvent.setup();
+    const { user } = setupAuthTest();
     mockSignIn.mockResolvedValue({ data: null, error: { message: 'Some other error' } });
-    renderWithProviders(<Auth />);
-
-    await user.type(screen.getByLabelText(/Email/i), 'test@example.com');
-    await user.type(screen.getByLabelText(/Mot de passe/i), 'password123');
+    await fillLoginForm(user, 'test@example.com', 'password123');
     await user.click(screen.getByRole('button', { name: /Se connecter/i }));
-
-    await waitFor(() => {
-      expect(mockSignIn).toHaveBeenCalled();
-    });
+    await waitFor(() => expect(mockSignIn).toHaveBeenCalled());
   });
 
   it('affiche une erreur si les mots de passe ne correspondent pas à l\'inscription', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<Auth />);
-
-    await user.click(screen.getByRole('tab', { name: /Inscription/i }));
-    
-    const emailInput = screen.getByLabelText(/Email/i, { selector: '#email-signup' });
-    const passwordInput = screen.getByLabelText(/Mot de passe/i, { selector: '#password-signup' });
-    const confirmInput = screen.getByLabelText(/Confirmer le mot de passe/i);
-    
-    await user.type(emailInput, 'test@example.com');
-    await user.type(passwordInput, 'password123');
-    await user.type(confirmInput, 'mismatch');
-    
+    const { user } = setupAuthTest();
+    await fillSignupForm(user, 'test@example.com', 'password123', 'mismatch');
     await user.click(screen.getByRole('button', { name: /Créer mon compte/i }));
-
     expect(mockSignUp).not.toHaveBeenCalled();
   });
 });
