@@ -70,7 +70,7 @@ export default function Catalog() {
         setShop(shopData);
 
         // Track shop view if not owner and auth is determined
-        if (!authLoading && (!user || user.id !== shopData.user_id)) {
+        if (!authLoading && (user?.id !== shopData.user_id)) {
           await supabase.from('kissariya_views').insert({
             shop_id: shopData.id,
           });
