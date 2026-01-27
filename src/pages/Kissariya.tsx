@@ -99,11 +99,10 @@ export default function Catalog() {
           .order('created_at', { ascending: false });
 
         if (productsData) {
-          const productsWithShop = productsData.map(p => ({
+          const allProducts = productsData.map(p => ({
             ...p,
             shops: shopData
-          }));
-          const allProducts = productsWithShop as unknown as Product[];
+          })) as unknown as Product[];
           setProducts(allProducts);
 
           // Open product from URL if present
