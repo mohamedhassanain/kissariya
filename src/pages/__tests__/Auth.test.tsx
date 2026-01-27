@@ -33,6 +33,16 @@ const renderWithProviders = (component: React.ReactNode) => {
   );
 };
 
+const fillSignupForm = async (user: any, email: string, pass: string, confirm: string) => {
+  await user.click(screen.getByRole('tab', { name: /Inscription/i }));
+  const emailInput = screen.getByLabelText(/Email/i, { selector: '#email-signup' });
+  const passwordInput = screen.getByLabelText(/Mot de passe/i, { selector: '#password-signup' });
+  const confirmInput = screen.getByLabelText(/Confirmer le mot de passe/i);
+  await user.type(emailInput, email);
+  await user.type(passwordInput, pass);
+  await user.type(confirmInput, confirm);
+};
+
 describe('Page Auth', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -86,16 +96,7 @@ describe('Page Auth', () => {
     mockSignUp.mockResolvedValue({ data: {}, error: null });
     renderWithProviders(<Auth />);
 
-    await user.click(screen.getByRole('tab', { name: /Inscription/i }));
-    
-    const emailInput = screen.getByLabelText(/Email/i, { selector: '#email-signup' });
-    const passwordInput = screen.getByLabelText(/Mot de passe/i, { selector: '#password-signup' });
-    const confirmInput = screen.getByLabelText(/Confirmer le mot de passe/i);
-    
-    await user.type(emailInput, 'new@example.com');
-    await user.type(passwordInput, 'password123');
-    await user.type(confirmInput, 'password123');
-    
+    await fillSignupForm(user, 'new@example.com', 'password123', 'password123');
     await user.click(screen.getByRole('button', { name: /Créer mon compte/i }));
 
     expect(mockSignUp).toHaveBeenCalledWith('new@example.com', 'password123');
@@ -106,16 +107,7 @@ describe('Page Auth', () => {
     mockSignUp.mockResolvedValue({ data: null, error: { message: 'User already registered' } });
     renderWithProviders(<Auth />);
 
-    await user.click(screen.getByRole('tab', { name: /Inscription/i }));
-    
-    const emailInput = screen.getByLabelText(/Email/i, { selector: '#email-signup' });
-    const passwordInput = screen.getByLabelText(/Mot de passe/i, { selector: '#password-signup' });
-    const confirmInput = screen.getByLabelText(/Confirmer le mot de passe/i);
-    
-    await user.type(emailInput, 'existing@example.com');
-    await user.type(passwordInput, 'password123');
-    await user.type(confirmInput, 'password123');
-    
+    await fillSignupForm(user, 'existing@example.com', 'password123', 'password123');
     await user.click(screen.getByRole('button', { name: /Créer mon compte/i }));
 
     await waitFor(() => {
