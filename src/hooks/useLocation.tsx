@@ -34,6 +34,8 @@ export function useLocation() {
     onSuccess: (city: string, url: string) => void,
     onError?: (message: string) => void
   ) => {
+    // Geolocation is used to help sellers precisely locate their shop/product
+    // which is essential for a local marketplace experience.
     if (!navigator.geolocation) {
       toast.error("La géolocalisation n'est pas supportée par votre navigateur");
       return;
@@ -64,8 +66,9 @@ export function useLocation() {
   }, [updateCityFromCoords]);
 
   const extractCoordsFromUrl = useCallback((url: string) => {
-    const regex1 = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
-    const regex2 = /q=(-?\d+\.\d+),(-?\d+\.\d+)/;
+    // Use non-backtracking regex to prevent ReDoS
+    const regex1 = /@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/;
+    const regex2 = /[?&]q=(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/;
     const coordsMatch = regex1.exec(url) || regex2.exec(url);
     if (coordsMatch) {
       return {
