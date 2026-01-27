@@ -367,7 +367,10 @@
     "plpgsql",
     "signup",
     "authentifié",
-    "créée"
+    "créée",
+    "inscrit",
+    "retournée",
+    "inattendue"
   ],
   "ignorePaths": [
     "node_modules",
