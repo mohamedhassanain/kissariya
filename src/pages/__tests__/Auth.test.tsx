@@ -112,12 +112,12 @@ describe('Page Auth', () => {
     // Google Sign In (API Error & Exception)
     mockSignInWithGoogle.mockResolvedValueOnce({ error: { message: 'Err' } });
     await user.click(screen.getByText(/Continuer avec Google/i));
-    mockSignInWithGoogle.mockImplementationOnce(() => { throw new Error(); });
+    mockSignInWithGoogle.mockImplementationOnce(() => { throw new Error('Google Fail'); });
     await user.click(screen.getByText(/Continuer avec Google/i));
     expect(mockSignInWithGoogle).toHaveBeenCalledTimes(2);
 
     // Erreurs de soumission (Exception & Générique)
-    mockSignIn.mockImplementationOnce(() => { throw new Error(); });
+    mockSignIn.mockImplementationOnce(() => { throw new Error('Submit Fail'); });
     await fillLoginForm(user, 't@t.com', 'p');
     await user.click(screen.getByRole('button', { name: /Se connecter/i }));
     mockSignIn.mockResolvedValueOnce({ data: null, error: { message: 'Err' } });
