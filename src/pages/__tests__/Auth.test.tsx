@@ -33,7 +33,7 @@ const renderWithProviders = (component: React.ReactNode) => {
   );
 };
 
-const fillSignupForm = async (user: any, email: string, pass: string, confirm: string) => {
+const fillSignupForm = async (user: ReturnType<typeof userEvent.setup>, email: string, pass: string, confirm: string) => {
   await user.click(screen.getByRole('tab', { name: /Inscription/i }));
   const emailInput = screen.getByLabelText(/Email/i, { selector: '#email-signup' });
   const passwordInput = screen.getByLabelText(/Mot de passe/i, { selector: '#password-signup' });
