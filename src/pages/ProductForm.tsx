@@ -5,6 +5,7 @@ import { useShop } from '@/hooks/useShop';
 import { useProducts, ProductFormData } from '@/hooks/useProducts';
 import { useCategories, useSubcategories } from '@/hooks/useCategories';
 import { useImageUpload } from '@/hooks/useImageUpload';
+import { useLocation } from '@/hooks/useLocation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,6 +32,7 @@ export default function ProductForm() {
   const { products, createProduct, updateProduct } = useProducts();
   const { categories } = useCategories();
   const { uploadImage, uploading } = useImageUpload();
+  const { isLocating, getCurrentLocation, updateCityFromCoords, extractCoordsFromUrl } = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState('');
@@ -46,7 +48,6 @@ export default function ProductForm() {
   const [locationUrl, setLocationUrl] = useState('');
   const [showLocation, setShowLocation] = useState(false);
   const [isActive, setIsActive] = useState(true);
-  const [isLocating, setIsLocating] = useState(false);
   const isMounted = useRef(true);
 
   useEffect(() => {
@@ -55,40 +56,15 @@ export default function ProductForm() {
     };
   }, []);
 
-  const updateCityFromCoords = async (lat: number, lon: number) => {
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
-        {
-          headers: {
-            'User-Agent': 'Kissariya/1.0'
-          }
-        }
-      );
-      if (!response.ok) throw new Error('Network response was not ok');
-      const data = await response.json();
-      if (isMounted.current && data.address) {
-        const city = data.address.city || data.address.town || data.address.village || data.address.suburb || data.address.county || '';
-        if (city) setLocationCity(city);
-      }
-    } catch (error) {
-      console.error("Error fetching city:", error);
-    }
-  };
-
-  const handleUrlChange = (url: string) => {
+  const handleUrlChange = async (url: string) => {
     setLocationUrl(url);
-    // Extract coordinates from Google Maps URL using safe, bounded regex to prevent ReDoS
-    // regex1 matches @lat,lon (common in Google Maps URLs)
-    // regex2 matches q=lat,lon (common in search URLs)
-    const regex1 = /@(-?\d{1,3}\.\d{1,15}),(-?\d{1,3}\.\d{1,15})/;
-    const regex2 = /[?&]q=(-?\d{1,3}\.\d{1,15}),(-?\d{1,3}\.\d{1,15})/;
-    const coordsMatch = regex1.exec(url) || regex2.exec(url);
-    if (coordsMatch) {
-      const lat = Number.parseFloat(coordsMatch[1]);
-      const lon = Number.parseFloat(coordsMatch[2]);
-      updateCityFromCoords(lat, lon);
-      toast.success("Coordonnées extraites du lien !");
+    const coords = extractCoordsFromUrl(url);
+    if (coords) {
+      const city = await updateCityFromCoords(coords.lat, coords.lon);
+      if (isMounted.current && city) {
+        setLocationCity(city);
+        toast.success("Coordonnées extraites du lien !");
+      }
     }
   };
 
@@ -171,69 +147,14 @@ export default function ProductForm() {
     setImagePreviews(newPreviews);
   };
 
-  const getCurrentLocation = () => {
-    // Geolocation is used here to help the seller precisely locate their shop/product
-    // for buyers, which is a core feature of the local marketplace.
-    if (!navigator.geolocation) {
-      toast.error("La géolocalisation n'est pas supportée par votre navigateur");
-      return;
-    }
-
-    setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        const url = `https://www.google.com/maps?q=${latitude},${longitude}`;
-        
-        if (isMounted.current) {
-          setLocationUrl(url);
-        }
-        
-    try {
-      // Reverse geocoding using OpenStreetMap Nominatim
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude},${longitude}`,
-        {
-          headers: {
-            'User-Agent': 'Kissariya/1.0'
-          }
-        }
-      );
-      const data = await response.json();
-          
-          if (isMounted.current && data.address) {
-            const city = data.address.city || 
-                         data.address.town || 
-                         data.address.village || 
-                         data.address.suburb || 
-                         data.address.county || 
-                         '';
-            if (city) {
-              setLocationCity(city);
-            }
-          }
-          toast.success("Position et ville récupérées !");
-        } catch (error) {
-          console.error("Error during reverse geocoding:", error);
-          toast.success("Position récupérée (ville non identifiée)");
-        } finally {
-          if (isMounted.current) {
-            setIsLocating(false);
-          }
-        }
-      },
-      (error) => {
-        setIsLocating(false);
-        let message = "Impossible de récupérer votre position";
-        if (error.code === 1) message = "Permission de géolocalisation refusée";
-        else if (error.code === 2) message = "Position non disponible";
-        else if (error.code === 3) message = "Délai d'attente dépassé";
-        
-        toast.error(message);
-        console.error(error);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+  const handleGetLocation = () => {
+    getCurrentLocation((city, url) => {
+      if (isMounted.current) {
+        setLocationCity(city);
+        setLocationUrl(url);
+        toast.success("Position et ville récupérées !");
+      }
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -524,7 +445,7 @@ export default function ProductForm() {
                           type="button" 
                           variant="outline" 
                           size="icon"
-                          onClick={getCurrentLocation}
+                          onClick={handleGetLocation}
                           disabled={isLocating}
                           title="Ma position actuelle"
                         >

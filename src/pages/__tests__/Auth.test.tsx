@@ -101,46 +101,31 @@ describe('Page Auth', () => {
     await waitFor(() => expect(mockSignUp).toHaveBeenCalledTimes(2));
   });
 
-  it('affiche une erreur de validation si l\'email est invalide', async () => {
-    const { user } = setupAuthTest();
-    await fillLoginForm(user, 'invalid-email', 'password123');
-    await user.click(screen.getByRole('button', { name: /Se connecter/i }));
-    expect(mockSignIn).not.toHaveBeenCalled();
-  });
-
-  it('gère les erreurs de Google Sign In', async () => {
+  it('valide les entrées et gère les erreurs (Email, Google, Mismatch)', async () => {
     const { user } = setupAuthTest();
     
-    // Cas 1: Erreur retournée par l'API
-    mockSignInWithGoogle.mockResolvedValueOnce({ error: { message: 'Google error' } });
-    await user.click(screen.getByText(/Continuer avec Google/i));
-    expect(mockSignInWithGoogle).toHaveBeenCalledTimes(1);
+    // Email invalide
+    await fillLoginForm(user, 'invalid-email', 'pass');
+    await user.click(screen.getByRole('button', { name: /Se connecter/i }));
+    expect(mockSignIn).not.toHaveBeenCalled();
 
-    // Cas 2: Erreur inattendue (exception)
-    mockSignInWithGoogle.mockImplementationOnce(() => { throw new Error('Unexpected Google'); });
+    // Google Sign In (API Error & Exception)
+    mockSignInWithGoogle.mockResolvedValueOnce({ error: { message: 'Err' } });
+    await user.click(screen.getByText(/Continuer avec Google/i));
+    mockSignInWithGoogle.mockImplementationOnce(() => { throw new Error(); });
     await user.click(screen.getByText(/Continuer avec Google/i));
     expect(mockSignInWithGoogle).toHaveBeenCalledTimes(2);
-  });
 
-  it('gère les erreurs inattendues lors de la soumission', async () => {
-    const { user } = setupAuthTest();
-    mockSignIn.mockImplementation(() => { throw new Error('Unexpected'); });
-    await fillLoginForm(user, 'test@example.com', 'password123');
+    // Erreurs de soumission (Exception & Générique)
+    mockSignIn.mockImplementationOnce(() => { throw new Error(); });
+    await fillLoginForm(user, 't@t.com', 'p');
     await user.click(screen.getByRole('button', { name: /Se connecter/i }));
-    await waitFor(() => expect(mockSignIn).toHaveBeenCalled());
-  });
-
-  it('affiche un message d\'erreur générique si la connexion échoue sans message spécifique', async () => {
-    const { user } = setupAuthTest();
-    mockSignIn.mockResolvedValue({ data: null, error: { message: 'Some other error' } });
-    await fillLoginForm(user, 'test@example.com', 'password123');
+    mockSignIn.mockResolvedValueOnce({ data: null, error: { message: 'Err' } });
     await user.click(screen.getByRole('button', { name: /Se connecter/i }));
-    await waitFor(() => expect(mockSignIn).toHaveBeenCalled());
-  });
+    await waitFor(() => expect(mockSignIn).toHaveBeenCalledTimes(2));
 
-  it('affiche une erreur si les mots de passe ne correspondent pas à l\'inscription', async () => {
-    const { user } = setupAuthTest();
-    await fillSignupForm(user, 'test@example.com', 'password123', 'mismatch');
+    // Mismatch mot de passe
+    await fillSignupForm(user, 't@t.com', 'p1', 'p2');
     await user.click(screen.getByRole('button', { name: /Créer mon compte/i }));
     expect(mockSignUp).not.toHaveBeenCalled();
   });
