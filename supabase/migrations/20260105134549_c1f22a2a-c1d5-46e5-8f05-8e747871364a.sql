@@ -163,9 +163,17 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
+-- Create function to centralize bucket name
+CREATE OR REPLACE FUNCTION public.get_storage_bucket_name()
+RETURNS TEXT AS $$
+BEGIN
+  RETURN 'shop-images';
+END;
+$$ LANGUAGE plpgsql IMMUTABLE SET search_path = public;
+
 -- Create storage bucket for images
-INSERT INTO storage.buckets (id, name, public) VALUES ('shop-images', 'shop-images', true);
+INSERT INTO storage.buckets (id, name, public) VALUES (public.get_storage_bucket_name(), public.get_storage_bucket_name(), true);
 
 -- Storage policies for shop images
-CREATE POLICY "Anyone can view shop images" ON storage.objects FOR SELECT USING (bucket_id = 'shop-images');
-CREATE POLICY "Authenticated users can manage shop images" ON storage.objects FOR ALL TO authenticated USING (bucket_id = 'shop-images') WITH CHECK (bucket_id = 'shop-images');
+CREATE POLICY "Anyone can view shop images" ON storage.objects FOR SELECT USING (bucket_id = public.get_storage_bucket_name());
+CREATE POLICY "Authenticated users can manage shop images" ON storage.objects FOR ALL TO authenticated USING (bucket_id = public.get_storage_bucket_name()) WITH CHECK (bucket_id = public.get_storage_bucket_name());

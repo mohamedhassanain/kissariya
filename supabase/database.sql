@@ -263,19 +263,27 @@ FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 -- =====================================================
 -- STORAGE (IMAGES)
 -- =====================================================
+-- Function to centralize bucket name and avoid duplication smells
+CREATE OR REPLACE FUNCTION public.get_storage_bucket_name()
+RETURNS TEXT AS $$
+BEGIN
+  RETURN 'shop-images';
+END;
+$$ LANGUAGE plpgsql IMMUTABLE SET search_path = public;
+
 INSERT INTO storage.buckets (id, name, public)
-VALUES ('shop-images', 'shop-images', true)
+VALUES (public.get_storage_bucket_name(), public.get_storage_bucket_name(), true)
 ON CONFLICT DO NOTHING;
 
 CREATE POLICY "shop_images_public_select"
 ON storage.objects FOR SELECT
-USING (bucket_id = 'shop-images');
+USING (bucket_id = public.get_storage_bucket_name());
 
 CREATE POLICY "shop_images_authenticated_manage"
 ON storage.objects FOR ALL
 TO authenticated
-USING (bucket_id = 'shop-images')
-WITH CHECK (bucket_id = 'shop-images');
+USING (bucket_id = public.get_storage_bucket_name())
+WITH CHECK (bucket_id = public.get_storage_bucket_name());
 
 -- =====================================================
 -- REFRESH SUPABASE SCHEMA
