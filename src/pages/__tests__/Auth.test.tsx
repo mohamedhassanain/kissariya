@@ -69,36 +69,36 @@ describe('Page Auth', () => {
     });
   });
 
-  it('gère la connexion avec succès', async () => {
+  it('gère la connexion (succès et erreur)', async () => {
     const { user } = setupAuthTest();
-    mockSignIn.mockResolvedValue({ data: {}, error: null });
+    
+    // Succès
+    mockSignIn.mockResolvedValueOnce({ data: {}, error: null });
     await fillLoginForm(user, 'test@example.com', 'password123');
     await user.click(screen.getByRole('button', { name: /Se connecter/i }));
     expect(mockSignIn).toHaveBeenCalledWith('test@example.com', 'password123');
-  });
 
-  it('affiche une erreur si les identifiants sont incorrects', async () => {
-    const { user } = setupAuthTest();
-    mockSignIn.mockResolvedValue({ data: null, error: { message: 'Invalid login credentials' } });
+    // Erreur
+    mockSignIn.mockResolvedValueOnce({ data: null, error: { message: 'Invalid' } });
     await fillLoginForm(user, 'wrong@example.com', 'wrongpass');
     await user.click(screen.getByRole('button', { name: /Se connecter/i }));
-    await waitFor(() => expect(mockSignIn).toHaveBeenCalled());
+    await waitFor(() => expect(mockSignIn).toHaveBeenCalledTimes(2));
   });
 
-  it('gère l\'inscription avec succès', async () => {
+  it('gère l\'inscription (succès et erreur)', async () => {
     const { user } = setupAuthTest();
-    mockSignUp.mockResolvedValue({ data: {}, error: null });
+    
+    // Succès
+    mockSignUp.mockResolvedValueOnce({ data: {}, error: null });
     await fillSignupForm(user, 'new@example.com', 'password123', 'password123');
     await user.click(screen.getByRole('button', { name: /Créer mon compte/i }));
     expect(mockSignUp).toHaveBeenCalledWith('new@example.com', 'password123');
-  });
 
-  it('affiche une erreur si l\'utilisateur existe déjà à l\'inscription', async () => {
-    const { user } = setupAuthTest();
-    mockSignUp.mockResolvedValue({ data: null, error: { message: 'User already registered' } });
+    // Erreur (déjà inscrit)
+    mockSignUp.mockResolvedValueOnce({ data: null, error: { message: 'Exists' } });
     await fillSignupForm(user, 'existing@example.com', 'password123', 'password123');
     await user.click(screen.getByRole('button', { name: /Créer mon compte/i }));
-    await waitFor(() => expect(mockSignUp).toHaveBeenCalled());
+    await waitFor(() => expect(mockSignUp).toHaveBeenCalledTimes(2));
   });
 
   it('affiche une erreur de validation si l\'email est invalide', async () => {
