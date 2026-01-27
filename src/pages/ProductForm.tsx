@@ -78,11 +78,11 @@ export default function ProductForm() {
 
   const handleUrlChange = (url: string) => {
     setLocationUrl(url);
-    // Extract coordinates from Google Maps URL using non-backtracking regex
+    // Extract coordinates from Google Maps URL using safe, bounded regex to prevent ReDoS
     // regex1 matches @lat,lon (common in Google Maps URLs)
     // regex2 matches q=lat,lon (common in search URLs)
-    const regex1 = /@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/;
-    const regex2 = /[?&]q=(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/;
+    const regex1 = /@(-?\d{1,3}\.\d{1,15}),(-?\d{1,3}\.\d{1,15})/;
+    const regex2 = /[?&]q=(-?\d{1,3}\.\d{1,15}),(-?\d{1,3}\.\d{1,15})/;
     const coordsMatch = regex1.exec(url) || regex2.exec(url);
     if (coordsMatch) {
       const lat = Number.parseFloat(coordsMatch[1]);

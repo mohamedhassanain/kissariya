@@ -66,9 +66,9 @@ export function useLocation() {
   }, [updateCityFromCoords]);
 
   const extractCoordsFromUrl = useCallback((url: string) => {
-    // Use non-backtracking regex to prevent ReDoS
-    const regex1 = /@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/;
-    const regex2 = /[?&]q=(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/;
+    // Use safe, bounded regex to prevent ReDoS (bounded quantifiers)
+    const regex1 = /@(-?\d{1,3}\.\d{1,15}),(-?\d{1,3}\.\d{1,15})/;
+    const regex2 = /[?&]q=(-?\d{1,3}\.\d{1,15}),(-?\d{1,3}\.\d{1,15})/;
     const coordsMatch = regex1.exec(url) || regex2.exec(url);
     if (coordsMatch) {
       return {
