@@ -39,7 +39,8 @@ export function QuickViewDialog({ product, isOpen, onOpenChange, onShare }: Read
 
   if (!product) return null;
 
-  const mapQuery = /(-?\d+\.\d+),(-?\d+\.\d+)/.exec(product.location_url || product.shops?.location_url || '')?.[0] || 
+  // Use safe, bounded regex to prevent ReDoS
+  const mapQuery = /(-?\d{1,3}\.\d{1,15}),(-?\d{1,3}\.\d{1,15})/.exec(product.location_url || product.shops?.location_url || '')?.[0] || 
                    product.location_city || 
                    product.shops?.location_city || '';
 
