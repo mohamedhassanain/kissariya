@@ -78,9 +78,11 @@ export default function ProductForm() {
 
   const handleUrlChange = (url: string) => {
     setLocationUrl(url);
-    // Extract coordinates from Google Maps URL
-    const regex1 = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
-    const regex2 = /q=(-?\d+\.\d+),(-?\d+\.\d+)/;
+    // Extract coordinates from Google Maps URL using non-backtracking regex
+    // regex1 matches @lat,lon (common in Google Maps URLs)
+    // regex2 matches q=lat,lon (common in search URLs)
+    const regex1 = /@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/;
+    const regex2 = /[?&]q=(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/;
     const coordsMatch = regex1.exec(url) || regex2.exec(url);
     if (coordsMatch) {
       const lat = Number.parseFloat(coordsMatch[1]);
@@ -170,6 +172,8 @@ export default function ProductForm() {
   };
 
   const getCurrentLocation = () => {
+    // Geolocation is used here to help the seller precisely locate their shop/product
+    // for buyers, which is a core feature of the local marketplace.
     if (!navigator.geolocation) {
       toast.error("La géolocalisation n'est pas supportée par votre navigateur");
       return;
