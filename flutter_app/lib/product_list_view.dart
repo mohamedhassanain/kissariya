@@ -21,13 +21,18 @@ class _ProductListViewState extends State<ProductListView> {
   }
 
   Future<List<Product>> _fetchProducts() async {
-    final response = await _supabase
-        .from('products')
-        .select()
-        .eq('is_active', true)
-        .order('created_at', ascending: false);
+    try {
+      final List<dynamic> response = await _supabase
+          .from('products')
+          .select()
+          .eq('is_active', true)
+          .order('created_at', ascending: false);
 
-    return (response as List).map((json) => Product.fromJson(json)).toList();
+      return response.map((json) => Product.fromJson(json as Map<String, dynamic>)).toList();
+    } catch (e) {
+      debugPrint('Error fetching products: $e');
+      rethrow;
+    }
   }
 
   @override
@@ -43,9 +48,14 @@ class _ProductListViewState extends State<ProductListView> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text('Error: ${snapshot.error}'),
+              ),
+            );
           }
-          final products = snapshot.data!;
+          final products = snapshot.data ?? [];
           if (products.isEmpty) {
             return const Center(child: Text('No products found.'));
           }

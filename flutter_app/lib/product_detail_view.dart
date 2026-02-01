@@ -16,7 +16,7 @@ class ProductDetailView extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (product.imageUrl != null)
+            if (product.imageUrl != null && product.imageUrl!.isNotEmpty)
               Image.network(
                 product.imageUrl!,
                 width: double.infinity,
@@ -42,7 +42,7 @@ class ProductDetailView extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.green, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
-                  if (product.description != null) ...[
+                  if (product.description != null && product.description!.isNotEmpty) ...[
                     Text(
                       'Description',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
