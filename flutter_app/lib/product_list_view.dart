@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'models/product.dart';
 import 'product_detail_view.dart';
+import 'config.dart';
 
 class ProductListView extends StatefulWidget {
   const ProductListView({super.key});
@@ -11,24 +12,26 @@ class ProductListView extends StatefulWidget {
 }
 
 class _ProductListViewState extends State<ProductListView> {
-  late final SupabaseClient _supabase;
-  late Future<List<Product>> _productsFuture;
+  late final Future<List<Product>> _productsFuture;
 
   @override
   void initState() {
     super.initState();
-    try {
-      _supabase = Supabase.instance.client;
-      _productsFuture = _fetchProducts();
-    } catch (e) {
-      debugPrint('Supabase client not initialized: $e');
-      _productsFuture = Future.error('Initialization error');
+    if (!Config.isConfigured) {
+      _productsFuture = Future.error('Configuration missing');
+    } else {
+      try {
+        final supabase = Supabase.instance.client;
+        _productsFuture = _fetchProducts(supabase);
+      } catch (e) {
+        _productsFuture = Future.error('Initialization error');
+      }
     }
   }
 
-  Future<List<Product>> _fetchProducts() async {
+  Future<List<Product>> _fetchProducts(SupabaseClient supabase) async {
     try {
-      final List<dynamic> response = await _supabase
+      final List<dynamic> response = await supabase
           .from('products')
           .select()
           .eq('is_active', true)
@@ -36,7 +39,6 @@ class _ProductListViewState extends State<ProductListView> {
 
       return response.map((json) => Product.fromJson(json as Map<String, dynamic>)).toList();
     } catch (e) {
-      debugPrint('Error fetching products: $e');
       rethrow;
     }
   }
