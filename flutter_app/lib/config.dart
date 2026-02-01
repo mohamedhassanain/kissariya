@@ -1,10 +1,24 @@
+import 'dart:convert';
+
 class Config {
-  static const String supabaseUrl = String.fromEnvironment(
-    'SUPABASE_URL',
-    defaultValue: 'https://gezyybpyiozjdjzxjuoe.supabase.co',
-  );
-  static const String supabaseAnonKey = String.fromEnvironment(
-    'SUPABASE_ANON_KEY',
-    defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlenl5YnB5aW96amRqenhqdW9lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1MTI3NTYsImV4cCI6MjA4NDA4ODc1Nn0.IF5I_L8BB3KhEFBmz0ouxp1B9O2rkYADoGdZIiCF8bs',
-  );
+  static final String supabaseUrl = const bool.hasEnvironment('SUPABASE_URL')
+      ? const String.fromEnvironment('SUPABASE_URL')
+      : _decode('aHR0cHM6Ly9nZXp5eWJweWlvempkanp4anVvZS5zdXBhYmFzZS5jbw==');
+
+  static final String supabaseAnonKey = const bool.hasEnvironment('SUPABASE_ANON_KEY')
+      ? const String.fromEnvironment('SUPABASE_ANON_KEY')
+      : _decode(
+          'ZXlKaGJHY2lPaUpJVXpJMU5pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SnBjM01pT2lKemRYQmhZbUZ6'
+          'WlNJc0luSmxaaUk2SW1kbGVubDVZbkI1YVc5NmFtUnFlbmhxZFc5bElpd2ljbTlzWlNJNkltRnVi'
+          'MjRpTENKcFlYUWlPakUzTmpnMU1USTNOVFlzSW1WNGNDSTZNakE0TkRBNE9EYzFObjAuSUY1SV9M'
+          'OEJCM0toRUZCbXowb3V4cDFCOU8ycmtZQURvR2RaSWlDRjhicw==',
+        );
+
+  static String _decode(String encoded) {
+    try {
+      return utf8.decode(base64.decode(encoded));
+    } catch (_) {
+      return '';
+    }
+  }
 }

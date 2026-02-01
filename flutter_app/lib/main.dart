@@ -6,10 +6,14 @@ import 'product_list_view.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Supabase.initialize(
-    url: Config.supabaseUrl,
-    anonKey: Config.supabaseAnonKey,
-  );
+  try {
+    await Supabase.initialize(
+      url: Config.supabaseUrl,
+      anonKey: Config.supabaseAnonKey,
+    );
+  } catch (e) {
+    debugPrint('Failed to initialize Supabase: $e');
+  }
 
   runApp(const MyApp());
 }

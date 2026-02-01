@@ -11,13 +11,19 @@ class ProductListView extends StatefulWidget {
 }
 
 class _ProductListViewState extends State<ProductListView> {
-  final _supabase = Supabase.instance.client;
+  late final SupabaseClient _supabase;
   late Future<List<Product>> _productsFuture;
 
   @override
   void initState() {
     super.initState();
-    _productsFuture = _fetchProducts();
+    try {
+      _supabase = Supabase.instance.client;
+      _productsFuture = _fetchProducts();
+    } catch (e) {
+      debugPrint('Supabase client not initialized: $e');
+      _productsFuture = Future.error('Initialization error');
+    }
   }
 
   Future<List<Product>> _fetchProducts() async {
@@ -48,16 +54,19 @@ class _ProductListViewState extends State<ProductListView> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(
+            return const Center(
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text('Error: ${snapshot.error}'),
+                padding: EdgeInsets.all(16.0),
+                child: Text(
+                  'Une erreur est survenue lors du chargement des produits. Veuillez réessayer plus tard.',
+                  textAlign: TextAlign.center,
+                ),
               ),
             );
           }
           final products = snapshot.data ?? [];
           if (products.isEmpty) {
-            return const Center(child: Text('No products found.'));
+            return const Center(child: Text('Aucun produit trouvé.'));
           }
 
           return GridView.builder(
